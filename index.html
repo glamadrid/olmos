@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mapa de Olmos, Perú</title>
+  <!-- Meta viewport para responsive móvil -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />:contentReference[oaicite:0]{index=0}
+
+  <!-- Hoja de estilos de Leaflet (incluir leaflet.css localmente) -->
+  <link rel="stylesheet" href="leaflet.css" />
+
+  <style>
+    /* Estilos básicos para que el mapa ocupe pantalla completa */
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #map { height: 100%; width: 100%; position: relative; }
+
+    /* Botón de "Mi Ubicación" sobre el mapa */
+    #locate-btn {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: white; border: none; border-radius: 4px;
+      padding: 6px 10px; font-size: 14px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    }
+
+    /* Estilos para contenido de los popups */
+    .popup-content img { max-width: 100%; height: auto; display: block; margin: 5px 0; }
+    .popup-content audio { width: 100%; margin: 5px 0; }
+    .carousel-controls { text-align: center; margin: 5px 0; }
+    .carousel-controls button {
+      background: #eee; border: none; padding: 5px 8px;
+      margin: 0 5px; border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Contenedor del mapa -->
+  <div id="map">
+    <!-- Botón para centrar en la ubicación actual -->
+    <button id="locate-btn">Mi Ubicación</button>
+  </div>
+
+  <!-- Incluimos la librería Leaflet (archivo JS local) -->
+  <script src="leaflet.js"></script>
+  <!-- Incluimos PapaParse (archivo JS local) -->
+  <script src="papaparse.min.js"></script>
+
+  <script>
+    // Fijar las URLs de iconos de Leaflet en formato base64 para no depender de imágenes externas
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAABSCAMAAAAhFXfZAAAC91BMVEVMaXEzeak2f7I4g7g3g7cua5gzeKg8hJo3grY4g7c3grU0gLI2frE0daAu'+
+                     'bJc2gbQwd6QzeKk2gLMtd5sxdKIua5g1frA2f7IydaM0e6w2fq41fK01eqo3grgubJgta5cxdKI1f7Ay'+
+                     'daQydaMxc6EubJgvbJkwcZ4ubZkwcJwubZgubJcydqUydKIxapgubJctbJcubZcubJcvbJYubJcvbZku'+
+                     'bJctbJctbZcubJg2f7AubJcrbZcubJcubJcua5g3grY0fq8ubJcubJdEkdEwhsw6i88vhswuhcsuhMtB'+
+                     'jMgthMsrg8srgss6is8qgcs8i9A9iMYtg8spgcoogMo7hcMngMonf8olfso4gr8kfck5iM8jfMk4iM8h'+
+                     'e8k1fro7itAgesk2hs8eecgzfLcofssdeMg0hc4cd8g2hcsxeLQbdsgZdcgxeLImfcszhM0vda4xgckz'+
+                     'hM4xg84wf8Yxgs4udKsvfcQucqhUndROmdM1fK0wcZ8vb5w0eqpQm9MzeKhXoNVcpdYydKNWn9VZotVK'+
+                     'ltJFjsIwcJ1Rms9OlslLmtH///8+kc9epdYzd6dbo9VHkMM2f7FHmNBClM8ydqVcpNY9hro3gLM9hLcz'+
+                     'ealQmcw3fa46f7A8gLMxc6I3eagyc6FIldJMl9JSnNRSntNNl9JPnNJFi75UnM9ZodVKksg8kM45jc09'+
+                     'e6ZHltFBk883gbRBh7pDk9EwcaBzn784g7dKkcY2i81Om9M7j85Llc81is09g7Q4grY/j9A0eqxKmdFF'+
+                     'ltBEjcXf6fFImdBCiLxJl9FGlNFBi78yiMxVndEvbpo6js74+vx+psPP3+o/ks5HkcpGmNCjwdZCkNDM'+
+                     '3ehYoNJEls+lxNkxh8xHks0+jdC1zd5Lg6r+/v/H2ufz9/o3jM3t8/edvdM/k89Th61OiLBSjbZklbaT'+
+                     't9BfptdjmL1AicBHj8hGk9FAgK1dkLNTjLRekrdClc/k7fM0icy0y9tgp9c4jc2NtM9Dlc8zicxeXZn3'+
+                     'AAAAQ3RSTlMAHDdTb4yPA+LtnEQmC4L2EmHqB7XA0d0sr478x4/Yd5i1zOfyPkf1sLVq4Nh3FvjxopQ2'+
+                     '/STNuFzUwFIwxKaejILpIBEV9wAABhVJREFUeF6s1NdyFEcYBeBeoQIhRAkLlRDGrhIgY3BJL8CVeKzu'+
+                     'yXFzzjkn5ZxzzuScg3PO8cKzu70JkO0LfxdTU//pM9vTu7Xgf6KqOVTb9X7toRrVEfBf1HTVjZccrT/2'+
+                     'by1VV928Yty9ZbVuucdz90frG8DBjl9pVApbOstvmMuvVgaNXSfAAd6pGxpy6yxf5ph43pS/4f3uoaGm'+
+                     '2rdu72S9xzOvMymkZFq/ptDrk90mhW7e4zl7HLzhxGWPR20xmSxJ/VqldG5m9XhaVOA1DadsNh3Pu5L2'+
+                     'N6QtPO/32JpqQBVVk20oy/Pi2s23WEvyfHbe1thadVQttvm7Llf65gGmXK67XtupyoM7HQhmXdLS8oGW'+
+                     'JNeOJ3C5fG5XCEJnkez3/oFdsvgJ4l2ANZwhrJKk/7OSXa+3Vw2WJMlKnGkobouYk6T0TyX30klOUnTD'+
+                     '9HJ5qpckL3EW/w4XF3Xd0FGywXUrstrclVsqz5Pd/sXFYyDnPdrLcQODmGOK47IZb4CmibmMn+MYRzFZ'+
+                     '5jg33ZL/EJrWcszHmANy3ARBK/IXtciJy8VsitPSdE3uuHxzougojcUdr8/32atnz/ev3f/K5wtpxUTp'+
+                     'caI45zusVDpYtZi+jg0oU9b3x74h7+n9ABvYEZeKaVq0sh0AtLKsFtqNBdeT0MrSzwwlq9+x6xAO4tgO'+
+                     'tSzbCjrNQQiNvQUbUEubvzBUeGw26yDCsRHCoLkTHDa7IdOLIThs/gHvChszh2CimE8peRs47cxANI0l'+
+                     'YNB5y1DljpOF0IhzBDPOZnDOqYYbeGKECbPzWnXludPphw5c2YBq5zlwXphIbO4VDCZ0gnPfUO1TwZoY'+
+                     'wAs2ExPCedAu9DAjfQUjzITQb3jNj0KG2Sgt6BHaQUdYzWz+XmBktOHwanXjaSTcwwziBcuMOtwBmqPr'+
+                     'TOxFQR/DRKKPqyur0aiW6cULYsx6tBm0jXpR/AUWR6HRq9WVW6MRhIq5jLyjbaCTDCijyYJNpCajdyob'+
+                     'P/eTw0iexBAKkJ3gA5KcQb2zBXsIBckn+xVv8jkZSaEFHE+jFEleAEfayRU0MouNoBmB/L50Ai/HSLIH'+
+                     'xcrpCvnhSQAuakKp2C/YbCylJjXRVy/z3+Kv/RrNcCo+WUzlVEhzKffnTQnxeN9fWF88fiNCUdSTsauf'+
+                     'aChKWInHeysygfpIqagoakW+vV20J8uyl6TyNKEZWV4oRSPyCkWpgOLSbkCObT8o2r6tlG58HQquf6O0'+
+                     'v50tB7JM7F4EORd2dx/K0w/KHsVkLPaoYrwgP/y7krr3SSMA4zj+OBgmjYkxcdIJQyQRKgg2viX9Hddi'+
+                     '9UBb29LrKR7CVVEEEXWojUkXNyfTNDE14W9gbHJNuhjDettN3ZvbOvdOqCD3Jp/9l+/wJE+9PkYGjx/f'+
+                     'qkys3S2rMozM/o2106rfMUINo6hVqz+eu/hd1c4xTg0TAfy5kV+4UG6+IthHTU9woWmxuKNbTfuCSfov'+
+                     'BCxq7EtHqvYL4Sm6F8GVxsSXHMQ07TOi1DKtZxjWaaIyi4CXWjxPccUw8WVbMYY5wxC1mzEyXMJWkllp'+
+                     'Rloi+Kkoq69sxBTlElF6aAxYUbjXNlhlDZilDnM4U5SlN5biRsRHnbx3mbeWjEh4mEyiuJDl5XcWVmX5'+
+                     'GvNkFgLWZM5qwsop4/AWfLhU1cR7k1VVvcYCWRkOI6Xy5gmnphCYIkvzuNYzHzosq2oNk2RtSs8khfUO'+
+                     'fHIDgR6ysYBaMpl4uEgk2U/oJTs9AaTSwma7dT69geAE2ZpEjUsn2ieJNHeKfrI3EcAGJ2ZaNgVuC8EB'+
+                     'ctCLc57P5u5led6IOBkIYkuQMrmmjChs4VkfOerHqSBkPzZlhe06RslZ3zMjk2sscqKwY0RcjKK+LWbz'+
+                     'd7KiHhkncs/siFJ+V5eXxD34B8nVuJEpGJNmxN2gH3vSvp7J70tF+D1Ej8qUJD1TkErAND2GZwTFg/Lu'+
+                     'bvmgiBG3SOvdlsqFQrkEzJCL1rstlnVFROixZoDDSuXQFHESwVGlcuQcMb/b42NgjLowh5MTDFE3vNB5'+
+                     'qStRIErdCQEh6pLPR92anSUb/wAIhldAaDMpGgAAAABJRU5ErkJggg==',
+      iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAApCAYAAADAk4LOAAAFgUlEQVR4Aa1XA5BjWRTN2oW17d3YaZtr2962HUzbDNpjszW24mRt28p47v7zq/bX'+
+               'Ztrp/lWnXr337j3nPCe85NcypgSFdugCpW5YoDAMRaIMqRi6aKq5E3YqDQO3qAwjVWrD8Ncq/RBpykd8'+
+               'oZUb/kaJutow8r1aP9II0WmLKLIsJyv1w/kqw9Ch2MYdB++12Onxee/QMwvf4/Dk/Lfp/i4nxTXtOoQ4'+
+               'pW5Aj7wpici1A9erdAN2OH64x8OSP9j3Ft3b7aWkTg/Fm91siTra0f9on5sQr9INejH6CUUUpavjFNq1'+
+               'B+Oadhxmnfa8RfEmN8VNAsQhPqF55xHkMzz3jSmChWU6f7/XZKNH+9+hBLOHYozuKQPxyMPUKkrX/K0u'+
+               'WnfFaJGS1QPRtZsOPtr3NsW0uyh6NNCOkU3Yz+bXbT3I8G3xE5EXLXtCXbbqwCO9zPQYPRTZ5vIDXD7U'+
+               '+w7rFDEoUUf7ibHIR4y6bLVPXrz8JVZEql13trxwue/uDivd3fkWRbS6/IA2bID4uk0UpF1N8qLlbBlX'+
+               's4Ee7HLTfV1j54APvODnSfOWBqtKVvjgLKzF5YdEk5ewRkGlK0i33Eofffc7HT56jD7/6U+qH3Cx7SBL'+
+               'NntH5YIPvODnyfIXZYRVDPqgHtLs5ABHD3YzLuespb7t79FY34DjMwrVrcTuwlT55YMPvOBnRrJ4VXTd'+
+               'NnYug5ucHLBjEpt30701A3Ts+HEa73u6dT3FNWwflY86eMHPk+Yu+i6pzUpRrW7SNDg5JHR4KapmM5Wv'+
+               '2E8Tfcb1HoqqHMHU+uWDD7zg54mz5/2BSnizi9T1Dg4QQXLToGNCkb6tb1NU+QAlGr1++eADrzhn/u8Q'+
+               '2YZhQVlZ5+CAOtqfbhmaUCS1ezNFVm2imDbPmPng5wmz+gwh+oHDce0eUtQ6OGDIyR0uUhUsoO3vfDmm'+
+               'gOezH0mZN59x7MBi++WDL1g/eEiU3avlidO671bkLfwbw5XV2P8Pzo0ydy4t2/0eu33xYSOMOD8hTf4C'+
+               'rBtGMSoXfPLchX+J0ruSePw3LZeK0juPJbYzrhkH0io7B3k164hiGvawhOKMLkrQLyVpZg8rHFW7E2uH'+
+               'OL888IBPlNZ1FPzstSJM694fWr6RwpvcJK60+0HCILTBzZLFNdtAzJaohze60T8qBzyh5ZuOg5e7uwQp'+
+               'pofEmf2++DYvmySqGBuKaicF1blQjhuHdvCIMvp8whTTfZzI7RldpwtSzL+F1+wkdZ2TBOW2gIF88PBT'+
+               'zD/gpeREAMEbxnJcaJHNHrpzji0gQCS6hdkEeYt9DF/2qPcEC8RM28Hwmr3sdNyht00byAut2k3gufWN'+
+               'tgtOEOFGUwcXWNDbdNbpgBGxEvKkOQsxivJx33iow0Vw5S6SVTrpVq11ysA2Rp7gTfPfktc6zhtXBBC+'+
+               'adRLshf6sG2RfHPZ5EAc4sVZ83yCN00Fk/4kggu40ZTvIEm5g24qtU4KjBrx/BTTH8ifVASAG7gKrnWx'+
+               'JDcU7x8X6Ecczhm3o6YicvsLXWfh3Ch1W0k8x0nXF+0fFxgt4phz8QvypiwCCFKMqXCnqXExjq10beH+'+
+               'UUA7+nG6mdG/Pu0f3LgFcGrl2s0kNNjpmoJ9o4B29CMO8dMT4Q5ox8uitF6fqsrJOr8qnwNbRzv6hSnG'+
+               '5wP+64C7h9lp30hKNtKdWjtdkbuPA19nJ7Tz3zR/ibgARbhb4AlhavcBebmTHcFl2fvYEnW0ox9xMxKB'+
+               'S8btJ+KiEbq9zA4RthQXDhPa0T9TEe69gWupwc6uBUphquXgf+/FrIjweHQS4/pduMe5ERUMHUd9xv8Z'+
+               'R98CxkS4F2n3EUrUZ10EYNw7BWm9x1GiPssi3GgiGRDKWRYZfXlON+dfNbM+GgIwYdwAAAAASUVORK5C'+
+               'YII=',
+      shadowUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACkAAAApCAQAAAACach9AAACMUlEQVR4Ae3ShY7jQBAE0Aoz/f9/HTMzhg1zrdKUrJbdx+Kd2nD8VNudfsL/Th//'+
+                 '/dyQN2TH6f3y/BGpC379rV+S+qqetBOxImNQXL8JCAr2V4iMQXHGNJxeCfZXhSRBcQMfvkOWUdtfzlLg'+
+                 'AENmZDcmo2TVmt8OSM2eXxBp3DjHSMFutqS7SbmemzBiR+xpKCNUIRkdkkYxhAkyGoBvyQFEJEefwSmm'+
+                 'vBfJuJ6aKqKWnAkvGZOaZXTUgFqYULWNSHUckZuR1HIIimUExutRxwzOLROIG4vKmCKQt364mIlhSyzA'+
+                 'f1m9lHZHJZrlAOMMztRRiKimp/rpdJDc9Awry5xTZCte7FHtuS8wJgeYGrex28xNTd086Dik7vUMscQO'+
+                 'a8y4DoGtCCSkAKlNwpgNtphjrC6MIHUkR6YWxxs6Sc5xqn222mmCRFzIt8lEdKx+ikCtg91qS2WpwVfB'+
+                 'elJCiQJwvzixfI9cxZQWgiSJelKnwBElKYtDOb2MFbhmUigbReQBV0Cg4+qMXSxXSyGUn4UbF8l+7qdS'+
+                 'GnTC0XLCmahIgUHLhLOhpVCtw4CzYXvLQWQbJNmxoCsOKAxSgBJno75avolkRw8iIAFcsdc02e9iyCd8'+
+                 'tHwmeSSoKTowIgvscSGZUOA7PuCN5b2BX9mQM7S0wYhMNU74zgsPBj3HU7wguAfnxxjFQGBE6pwN+GjM'+
+                 'E9zHY7zGp8wVxMShYX9NXvEWD3HbwJf4giO4CFIQxXScH1/TM+04kkBiAAAAAElFTkSuQmCC'
+    });
+
+    // Inicializar el mapa centrado en Olmos, Perú (coordenadas aproximadas)
+    var map = L.map('map').setView([-5.98472, -79.74528], 13);
+
+    // Capa de mapas de OpenStreetMap (se utiliza un servidor público de tiles de OSM)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Función para crear contenido HTML de popup dado un objeto de datos (fila del CSV)
+    function crearPopupContent(dato) {
+      var titulo = dato.titulo || dato.Titulo || dato["Título"];  // acepta variantes de nombre de columna
+      var descr  = dato.descripcion || dato.Descripcion || dato["Descripción"];
+      var fotos  = dato.fotos || dato.Fotos;
+      var videos = dato.videos || dato.Videos;
+      var audios = dato.audios || dato.Audios;
+
+      // Construir el HTML del popup
+      var html = '<div class="popup-content">';
+      if (titulo) html += '<h3>' + titulo + '</h3>';
+      if (descr)  html += '<p>' + descr + '</p>';
+
+      // Carrusel de fotos (si hay URLs de fotos)
+      if (fotos) {
+        var fotosArr = fotos.split('|').map(s => s.trim()).filter(s => s);
+        if (fotosArr.length > 0) {
+          // Mostrar primera foto
+          html += '<img id="foto" src="' + fotosArr[0] + '" alt="Foto" />';
+          // Controles de carrusel de fotos
+          if (fotosArr.length > 1) {
+            html += '<div class="carousel-controls">';
+            html += '<button type="button" id="prevFoto">◀️</button>';
+            html += '<button type="button" id="nextFoto">▶️</button>';
+            html += '</div>';
+          }
+        }
+      }
+
+      // Carrusel de audios (si hay URLs de audio/notas de voz)
+      if (audios) {
+        var audiosArr = audios.split('|').map(s => s.trim()).filter(s => s);
+        if (audiosArr.length > 0) {
+          // Mostrar primer audio
+          html += '<audio id="audio" controls src="' + audiosArr[0] + '"></audio>';
+          // Controles de carrusel de audios
+          if (audiosArr.length > 1) {
+            html += '<div class="carousel-controls">';
+            html += '<button type="button" id="prevAudio">◀️</button>';
+            html += '<button type="button" id="nextAudio">▶️</button>';
+            html += '</div>';
+          }
+        }
+      }
+
+      // Video embebido (si hay URL de video)
+      if (videos) {
+        var videoUrl = videos.split('|')[0].trim();  // solo se usa el primer video
+        if (videoUrl) {
+          // Si es un enlace de YouTube, insertar iframe; si es .mp4, usar <video>
+          if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
+            // Convertir enlace de YouTube a URL de inserción
+            var videoId = videoUrl.split('v=')[1] || videoUrl.split('/').pop();
+            var embedUrl = "https://www.youtube.com/embed/" + videoId;
+            html += '<iframe width="100%" height="200" src="' + embedUrl + '" frameborder="0" allowfullscreen></iframe>';
+          } else if (videoUrl.match(/\.(mp4|webm|ogg)$/i)) {
+            html += '<video width="100%" height="200" controls src="' + videoUrl + '"></video>';
+          } else {
+            // Otro tipo de video (p.ej. Vimeo) – incrustar en iframe genérico
+            html += '<iframe width="100%" height="200" src="' + videoUrl + '" frameborder="0" allowfullscreen></iframe>';
+          }
+        }
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    // Cargar datos desde Google Sheets CSV usando PapaParse
+    var publicSpreadsheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";  // <-- Reemplace con su URL de CSV publicada
+    Papa.parse(publicSpreadsheetUrl, {
+      download: true,
+      header: true,
+      complete: function(results) {
+        var data = results.data;
+        data.forEach(function(item) {
+          if (!item.latitud || !item.longitud) return;  // saltar si no hay coordenadas
+          var lat = parseFloat(item.latitud || item.Latitud);
+          var lon = parseFloat(item.longitud || item.Longitud);
+          if (isNaN(lat) || isNaN(lon)) return;
+
+          // Crear marcador por cada fila
+          var marker = L.marker([lat, lon]).addTo(map);
+          var popupHtml = crearPopupContent(item);
+          marker.bindPopup(popupHtml);
+
+          // Eventos para controlar el carrusel cuando se abre el popup
+          marker.on('popupopen', function(e) {
+            var popupNode = e.popup.getElement();
+            if (!popupNode) return;
+            var fotoEl = popupNode.querySelector('#foto');
+            var audioEl = popupNode.querySelector('#audio');
+            var fotosArr = item.fotos ? item.fotos.split('|').map(s => s.trim()).filter(s => s) : [];
+            var audiosArr = item.audios ? item.audios.split('|').map(s => s.trim()).filter(s => s) : [];
+
+            // Funciones de navegación
+            var fotoIndex = 0;
+            var audioIndex = 0;
+            function mostrarFoto(idx) {
+              if (fotoEl) fotoEl.src = fotosArr[idx];
+            }
+            function mostrarAudio(idx) {
+              if (audioEl) {
+                audioEl.src = audiosArr[idx];
+                audioEl.play().catch(() => {}); // intentar reproducir automáticamente
+              }
+            }
+
+            // Adjuntar manejadores a botones si existen
+            var prevFotoBtn = popupNode.querySelector('#prevFoto');
+            var nextFotoBtn = popupNode.querySelector('#nextFoto');
+            if (prevFotoBtn) {
+              prevFotoBtn.onclick = function() {
+                fotoIndex = (fotoIndex - 1 + fotosArr.length) % fotosArr.length;
+                mostrarFoto(fotoIndex);
+              };
+            }
+            if (nextFotoBtn) {
+              nextFotoBtn.onclick = function() {
+                fotoIndex = (fotoIndex + 1) % fotosArr.length;
+                mostrarFoto(fotoIndex);
+              };
+            }
+            var prevAudioBtn = popupNode.querySelector('#prevAudio');
+            var nextAudioBtn = popupNode.querySelector('#nextAudio');
+            if (prevAudioBtn) {
+              prevAudioBtn.onclick = function() {
+                audioIndex = (audioIndex - 1 + audiosArr.length) % audiosArr.length;
+                mostrarAudio(audioIndex);
+              };
+            }
+            if (nextAudioBtn) {
+              nextAudioBtn.onclick = function() {
+                audioIndex = (audioIndex + 1) % audiosArr.length;
+                mostrarAudio(audioIndex);
+              };
+            }
+          });
+        });
+      }
+    });
+    
+    // Manejar botón "Mi Ubicación"
+    var locateBtn = document.getElementById('locate-btn');
+    locateBtn.onclick = function() {
+      map.locate({ setView: true, maxZoom: 16 });
+    };
+
+    // Cuando se encuentra la ubicación, agregar un marcador y popup
+    map.on('locationfound', function(e) {
+      var radius = e.accuracy || 50;  // exactitud en metros
+      L.marker(e.latlng).addTo(map)
+        .bindPopup("Usted está aproximadamente a " + radius.toFixed(0) + " metros de este punto.").openPopup();
+      L.circle(e.latlng, { radius: radius }).addTo(map);
+    });
+
+    // En caso de error de geolocalización
+    map.on('locationerror', function(e) {
+      alert("No se pudo obtener su ubicación");
+    });
+  </script>
+</body>
+</html>
