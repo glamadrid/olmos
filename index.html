@@ -6,10 +6,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; }
-    #map { height: 100vh; width: 100vw; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #map { height: 100%; width: 100%; }
+    #geolocate-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: white;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+      cursor: pointer;
+      z-index: 1001;
+    }
+    #geolocate-btn img {
+      width: 24px;
+      height: 24px;
+    }
     .popup-content img { max-width: 100%; height: auto; display: block; margin: 5px 0; }
-    .popup-content audio, video { width: 100%; margin: 5px 0; }
+    .popup-content audio { width: 100%; margin: 5px 0; }
     .carousel-controls { text-align: center; margin: 5px 0; }
     .carousel-controls button {
       background: #eee; border: none; padding: 5px 8px;
@@ -18,11 +36,13 @@
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map">
+    <button id="geolocate-btn" title="Mi ubicación">
+      <img src="https://cdn-icons-png.flaticon.com/512/61/61088.png" alt="Ubicación" />
+    </button>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
   <script>
     const map = L.map('map').setView([-6.046, -79.758], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -48,87 +68,38 @@
       color: '#ffcc00', fillColor: '#ff0000', fillOpacity: 0.4
     }).addTo(map).bindPopup('<b>FUEGO Nº4</b><br>Área: 200 ha');
 
-    // URL de Google Sheets en CSV
-    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
-
-    Papa.parse(sheetUrl, {
-      download: true,
-      header: true,
-      complete: function(results) {
-        results.data.forEach((item) => {
-          const lat = parseFloat(item.latitud);
-          const lon = parseFloat(item.longitud);
-          if (isNaN(lat) || isNaN(lon)) return;
-
-          let html = `<div class="popup-content">`;
-          html += `<h3>${item.titulo || 'Sin título'}</h3>`;
-          html += `<p>${item.descripcion || 'Sin descripción'}</p>`;
-
-          // Fotos
-          const fotos = (item.fotos || '').split('|').filter(f => f.trim());
-          if (fotos.length > 0) {
-            html += `<img src="${fotos[0]}" alt="Foto">`;
-            if (fotos.length > 1) {
-              html += `<div class="carousel-controls">
-                <button onclick="nextFoto(-1)">◀️</button>
-                <button onclick="nextFoto(1)">▶️</button>
-              </div>`;
-            }
-          } else {
-            html += `<p>📷 Sin fotos disponibles.</p>`;
-          }
-
-          // Videos
-          const videos = (item.videos || '').split('|').filter(v => v.trim());
-          if (videos.length > 0) {
-            let videoUrl = videos[0];
-            if (videoUrl.includes("youtube.com")) {
-              const videoId = new URL(videoUrl).searchParams.get("v");
-              html += `<iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
-            } else {
-              html += `<video controls><source src="${videoUrl}" type="video/mp4"></video>`;
-            }
-          } else {
-            html += `<p>🎥 Sin video disponible.</p>`;
-          }
-
-          // Audios
-          const audios = (item.audios || '').split('|').filter(a => a.trim());
-          if (audios.length > 0) {
-            html += `<audio controls src="${audios[0]}"></audio>`;
-            if (audios.length > 1) {
-              html += `<div class="carousel-controls">
-                <button onclick="nextAudio(-1)">◀️</button>
-                <button onclick="nextAudio(1)">▶️</button>
-              </div>`;
-            }
-          } else {
-            html += `<p>🔈 Sin notas de voz disponibles.</p>`;
-          }
-
-          html += `</div>`;
-          const marker = L.marker([lat, lon]).addTo(map);
-          marker.bindPopup(html).openPopup();
-        });
+    // Geolocalización en tiempo real
+    let userMarker = null;
+    let userCircle = null;
+    document.getElementById('geolocate-btn').addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        alert("Tu navegador no soporta geolocalización.");
+        return;
       }
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const latlng = [pos.coords.latitude, pos.coords.longitude];
+          if (!userMarker) {
+            userMarker = L.marker(latlng).addTo(map).bindPopup("📍 Estás aquí").openPopup();
+            userCircle = L.circle(latlng, { radius: pos.coords.accuracy || 50 }).addTo(map);
+            map.setView(latlng, 16);
+          } else {
+            userMarker.setLatLng(latlng);
+            userCircle.setLatLng(latlng);
+            map.panTo(latlng);
+          }
+        },
+        (err) => {
+          console.warn("Error al obtener ubicación:", err.message);
+          alert("No se pudo obtener tu ubicación.");
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 5000,
+          timeout: 10000
+        }
+      );
     });
-
-    // Carruseles (si decides implementar funcionalidad múltiple)
-    let fotoIndex = 0;
-    let audioIndex = 0;
-    function nextFoto(dir) {
-      const imgs = document.querySelectorAll('img#foto');
-      if (!imgs.length) return;
-      fotoIndex = (fotoIndex + dir + imgs.length) % imgs.length;
-      imgs.forEach((img, i) => img.style.display = (i === fotoIndex ? 'block' : 'none'));
-    }
-
-    function nextAudio(dir) {
-      const audios = document.querySelectorAll('audio#audio');
-      if (!audios.length) return;
-      audioIndex = (audioIndex + dir + audios.length) % audios.length;
-      audios.forEach((a, i) => a.style.display = (i === audioIndex ? 'block' : 'none'));
-    }
   </script>
 </body>
 </html>
