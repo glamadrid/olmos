@@ -1,142 +1,310 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Mapa Jayanca</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="leaflet.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa Interactivo</title>
+  <!-- Leaflet CSS desde CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
-    #map { height: 100%; width: 100%; }
-    #locate-btn {
-      position: absolute; top: 10px; right: 10px; z-index: 1000;
-      background: white; border: none; border-radius: 4px;
-      padding: 6px 10px; font-size: 14px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    /* Estilos básicos para el mapa y elementos de popup */
+    #map { height: 100vh; width: 100%; }  /* El mapa ocupa toda la pantalla */
+    .carousel-container { position: relative; text-align: center; }
+    .carousel-image { display: none; max-width: 100%; height: auto; }
+    .carousel-image.active { display: block; }
+    .carousel-controls { 
+      position: absolute; top: 50%; width: 100%; 
+      pointer-events: none; /* Permite hacer clic solo en los botones, no en el fondo */
     }
-    .popup-content img { max-width: 100%; height: auto; display: block; margin: 5px 0; }
-    .popup-content audio { width: 100%; margin: 5px 0; }
-    .carousel-controls { text-align: center; margin: 5px 0; }
-    .carousel-controls button {
-      background: #eee; border: none; padding: 5px 8px;
-      margin: 0 5px; border-radius: 4px;
+    .carousel-controls button { 
+      pointer-events: auto; 
+      background: rgba(255, 255, 255, 0.8); 
+      border: none; padding: 5px; 
+      font-size: 18px; line-height: 1; 
     }
+    .carousel-controls .prev { position: absolute; left: 5px; }
+    .carousel-controls .next { position: absolute; right: 5px; }
+    .leaflet-popup-content img { max-width: 100%; height: auto; }  /* Imágenes responsivas en popups */
   </style>
 </head>
 <body>
-  <div id="map">
-    <button id="locate-btn">Mi Ubicación</button>
-  </div>
+  <div id="map"></div>
 
-  <script src="leaflet.js"></script>
-  <script src="papaparse.min.js"></script>
-
+  <!-- Leaflet JS y PapaParse JS desde CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
+          integrity="sha256-Fh801SO9gqegfUdkDxyzXzIUPWzO/Vatqj8uN+5xcL4=" crossorigin="anonymous"></script>
   <script>
-    const map = L.map('map').setView([-6.046, -79.758], 15);
-
+    // Inicialización del mapa centrado en una ubicación genérica por defecto
+    var map = L.map('map').setView([0, 0], 2);  // Se puede ajustar la vista inicial según necesidad
+    // Capa de mosaicos de OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Polígonos
-    L.polygon([
-      [-6.041930, -79.744010],
-      [-6.050974, -79.743989],
-      [-6.051036, -79.771093],
-      [-6.041992, -79.771113],
-      [-6.041930, -79.744010]
-    ], {
-      color: '#0000ff', fillColor: '#00ff00', fillOpacity: 0.4
-    }).addTo(map).bindPopup('<b>Arianna 4</b><br>Área: 300 ha');
+    // Arreglo para almacenar todos los marcadores de los puntos (para gestionar popups después)
+    var markers = [];
+    // Variable para marcar el estado de visibilidad de popups (todos abiertos o solo el cercano)
+    var allPopupsOpen = true;
+    // Marcador para la ubicación del usuario (se crea al usar "Mi ubicación")
+    var userMarker = null;
 
-    L.polygon([
-      [-6.036191, -79.746322],
-      [-6.045236, -79.746302],
-      [-6.045277, -79.764370],
-      [-6.036233, -79.764391],
-      [-6.036191, -79.746322]
-    ], {
-      color: '#ffcc00', fillColor: '#ff0000', fillOpacity: 0.4
-    }).addTo(map).bindPopup('<b>FUEGO Nº4</b><br>Área: 200 ha');
+    // Función para crear el contenido HTML de cada popup dado un objeto de datos (fila CSV)
+    function createPopupContent(data) {
+      // Obtener campos (con valores predeterminados si están vacíos)
+      var title = data.titulo && data.titulo.trim() !== "" ? data.titulo : "Sin título";
+      var desc = data.descripcion && data.descripcion.trim() !== "" ? data.descripcion : "Sin descripción";
+      // Inicio del contenido del popup: título en negrita y descripción en cursiva
+      var html = "<strong>" + title + "</strong><br><em>" + desc + "</em><br>";
 
-    document.getElementById('locate-btn').onclick = function() {
-      map.locate({ setView: true, maxZoom: 17 });
-    };
-
-    map.on('locationfound', function(e) {
-      L.marker(e.latlng).addTo(map)
-        .bindPopup("📍 Usted está aquí").openPopup();
-      L.circle(e.latlng, { radius: e.accuracy || 50 }).addTo(map);
-    });
-
-    map.on('locationerror', function() {
-      alert("No se pudo obtener su ubicación");
-    });
-
-    const publicSpreadsheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
-
-    Papa.parse(publicSpreadsheetUrl, {
-      download: true,
-      header: true,
-      complete: function(results) {
-        results.data.forEach(item => {
-          const lat = parseFloat(item.latitud);
-          const lon = parseFloat(item.longitud);
-          if (isNaN(lat) || isNaN(lon)) return;
-
-          const fotos = (item.fotos || '').split('|').filter(f => f.trim());
-          const audios = (item.audios || '').split('|').filter(a => a.trim());
-          const videos = (item.videos || '').split('|').filter(v => v.trim());
-
-          let html = `<div class="popup-content">`;
-          html += `<h3>${item.titulo || ''}</h3>`;
-          html += `<p>${item.descripcion || ''}</p>`;
-
-          if (fotos.length > 0) {$1} else { html += '<p>📷 Sin fotos disponibles.</p>'; }" alt="Foto" />`;
-            if (fotos.length > 1) {
-              html += `<div class="carousel-controls">
-                <button onclick="nextFoto(-1)">◀️</button>
-                <button onclick="nextFoto(1)">▶️</button>
-              </div>`;
-            }
-          }
-
-          if (audios.length > 0) {$1} else { html += '<p>🔈 Sin notas de voz disponibles.</p>'; }"></audio>`;
-            if (audios.length > 1) {
-              html += `<div class="carousel-controls">
-                <button onclick="nextAudio(-1)">◀️</button>
-                <button onclick="nextAudio(1)">▶️</button>
-              </div>`;
-            }
-          }
-
-          if (videos.length > 0) {$1} else { html += '<p>🎥 Sin video disponible.</p>'; }
-            html += `<iframe width="100%" height="200" src="${videoUrl}" frameborder="0" allowfullscreen></iframe>`;
-          }
-
-          html += '</div>';
-
-          const marker = L.marker([lat, lon]).addTo(map);
-          marker.bindPopup(html).openPopup();
+      // Galería de imágenes (separadas por '|')
+      var imagesList = [];
+      if (data.fotos && data.fotos.trim() !== "") {
+        // Separar la cadena por '|' y limpiar espacios
+        imagesList = data.fotos.split('|').map(function(u) { return u.trim(); }).filter(function(u) { return u !== ""; });
+      }
+      // Si no hay imágenes proporcionadas, usar una imagen de demostración por defecto
+      if (imagesList.length === 0) {
+        imagesList = ["https://placehold.co/400x200.png?text=Sin+Imagen"];
+      }
+      // Construir HTML del carrusel de imágenes
+      if (imagesList.length > 0) {
+        html += '<div class="carousel-container">';
+        imagesList.forEach(function(url, index) {
+          html += '<img src="' + url + '" class="carousel-image ' + (index === 0 ? 'active' : '') + '" alt="Foto ' + (index+1) + '">';
         });
+        // Si hay más de una imagen, agregar controles de navegación (prev/next)
+        if (imagesList.length > 1) {
+          html += '<div class="carousel-controls">';
+          html += '<button type="button" class="prev">&#8249;</button>';  // Flecha izquierda
+          html += '<button type="button" class="next">&#8250;</button>';  // Flecha derecha
+          html += '</div>';
+        }
+        html += '</div><br>';
+      }
+
+      // Video embebido (URL de YouTube, MP4, etc.)
+      if (data.videos && data.videos.trim() !== "") {
+        var videoUrls = data.videos.split('|').map(function(v) { return v.trim(); }).filter(function(v) { return v !== ""; });
+        // Tomar solo el primer video si hay múltiples
+        var videoUrl = videoUrls[0];
+        if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
+          // Si es un enlace de YouTube, extraer el ID del video
+          var videoId = "";
+          if (videoUrl.includes("watch?v=")) {
+            // Formato completo de YouTube
+            var params = new URLSearchParams(videoUrl.split('?')[1]);
+            videoId = params.get('v');
+          } else if (videoUrl.includes("youtu.be")) {
+            // Enlace corto de YouTube
+            videoId = videoUrl.split('/').pop();
+          }
+          if (videoId) {
+            // Incrustar video de YouTube mediante iframe
+            html += '<iframe width="100%" height="200" src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen></iframe><br>';
+          } else {
+            // Si no se pudo extraer ID, intentar usar directamente un video HTML5 si es mp4
+            if (videoUrl.match(/\.(mp4|webm|ogg)$/i)) {
+              html += '<video controls width="100%" src="' + videoUrl + '">Tu navegador no soporta video HTML.</video><br>';
+            } else {
+              // En último caso, mostrar un enlace de texto al video
+              html += '<a href="' + videoUrl + '" target="_blank">Ver video</a><br>';
+            }
+          }
+        } else if (videoUrl.match(/\.(mp4|webm|ogg)$/i)) {
+          // Si es un archivo de video directo (mp4, webm, etc.), usar etiqueta <video>
+          html += '<video controls width="100%"><source src="' + videoUrl + '" type="video/mp4">Tu navegador no soporta video HTML.</video><br>';
+        } else {
+          // Para otras URLs (por ejemplo Vimeo u otras plataformas), intentar con iframe genérico
+          html += '<iframe width="100%" height="200" src="' + videoUrl + '" frameborder="0" allowfullscreen></iframe><br>';
+        }
+      } else {
+        // Si no hay video proporcionado, insertar un video de demostración por defecto
+        html += '<video controls width="100%"><source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4"><source src="https://www.w3schools.com/html/mov_bbb.ogg" type="video/ogg">Tu navegador no soporta video HTML.</video><br>';
+      }
+
+      // Audio reproducible (URL de archivo de audio o streaming)
+      if (data.audios && data.audios.trim() !== "") {
+        var audioUrls = data.audios.split('|').map(function(a) { return a.trim(); }).filter(function(a) { return a !== ""; });
+        // Tomar el primer audio si hay varios
+        var audioUrl = audioUrls[0];
+        // Insertar reproductor de audio
+        html += '<audio controls src="' + audioUrl + '">Tu navegador no soporta audio HTML.</audio><br>';
+      } else {
+        // Si no hay audio proporcionado, insertar un audio de demostración por defecto
+        html += '<audio controls><source src="https://www.w3schools.com/html/horse.mp3" type="audio/mpeg"><source src="https://www.w3schools.com/html/horse.ogg" type="audio/ogg">Tu navegador no soporta audio HTML.</audio><br>';
+      }
+
+      return html;
+    }
+
+    // Función para adjuntar eventos al carrusel (navegación de imágenes) cuando se abre un popup
+    function attachCarouselEvents(popupElement) {
+      var images = popupElement.querySelectorAll('.carousel-image');
+      if (images.length === 0) return;  // Si no hay imágenes, no hace nada
+      var currentIndex = 0;
+      var prevBtn = popupElement.querySelector('.carousel-controls .prev');
+      var nextBtn = popupElement.querySelector('.carousel-controls .next');
+      // Función interna para mostrar la imagen en un índice específico
+      function showImage(index) {
+        images.forEach(function(img, i) {
+          img.classList.toggle('active', i === index);
+        });
+        currentIndex = index;
+      }
+      // Si existen botones de navegación, agregar manejadores de evento
+      if (prevBtn && nextBtn) {
+        prevBtn.addEventListener('click', function(e) {
+          e.stopPropagation();  // Evita que el clic cierre el popup
+          var newIndex = (currentIndex - 1 + images.length) % images.length;
+          showImage(newIndex);
+        });
+        nextBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var newIndex = (currentIndex + 1) % images.length;
+          showImage(newIndex);
+        });
+      }
+    }
+
+    // Cargar datos desde la hoja de cálculo de Google Sheets en formato CSV
+    var csvUrl = "URL_DE_CSV_AQUI";  // Reemplazar con el enlace CSV publicado de Google Sheets
+    Papa.parse(csvUrl, {
+      download: true,
+      header: true,  // Usa la primera fila del CSV como nombres de campos
+      complete: function(results) {
+        var data = results.data;
+        data.forEach(function(item) {
+          // Leer coordenadas de la fila
+          var lat = parseFloat(item.latitud);
+          var lon = parseFloat(item.longitud);
+          if (isNaN(lat) || isNaN(lon)) {
+            return;  // Saltar esta fila si latitud/longitud no son válidos
+          }
+          // Crear un marcador Leaflet para este punto
+          var marker = L.marker([lat, lon]).addTo(map);
+          // Generar el contenido HTML del popup para este marcador
+          var popupHTML = createPopupContent(item);
+          // Vincular el popup al marcador. autoClose: false permite múltiples popups abiertos simultáneamente.
+          marker.bindPopup(popupHTML, {
+            autoClose: false,
+            closeOnClick: false,
+            autoPan: false,    // Deshabilitar auto-pan para que al abrir múltiples popups no reajuste el mapa
+            maxWidth: 400      // Ancho máximo del popup (se puede ajustar para diseño responsivo)
+          });
+          // Abrir el popup inmediatamente (mostrando todos los popups al cargar el mapa)
+          marker.openPopup();
+          // Cuando se abra el popup (evento), adjuntar funcionalidad del carrusel de imágenes
+          marker.on('popupopen', function(e) {
+            var popupElem = e.popup.getElement();
+            if (popupElem) {
+              attachCarouselEvents(popupElem);
+            }
+          });
+          // Añadir el marcador al arreglo global de marcadores
+          markers.push(marker);
+        });
+        // Una vez cargados los marcadores, ajustar la vista del mapa para mostrarlos todos (opcional)
+        if (markers.length > 0) {
+          var group = L.featureGroup(markers);
+          map.fitBounds(group.getBounds(), { padding: [50, 50] });
+        }
       }
     });
 
-    let fotoIndex = 0;
-    let audioIndex = 0;
-    function nextFoto(dir) {
-      const imgs = document.querySelectorAll('img#foto');
-      if (!imgs.length) return;
-      fotoIndex = (fotoIndex + dir + imgs.length) % imgs.length;
-      imgs.forEach((img, i) => img.style.display = (i === fotoIndex ? 'block' : 'none'));
-    }
-    function nextAudio(dir) {
-      const audios = document.querySelectorAll('audio#audio');
-      if (!audios.length) return;
-      audioIndex = (audioIndex + dir + audios.length) % audios.length;
-      audios.forEach((a, i) => a.style.display = (i === audioIndex ? 'block' : 'none'));
-    }
+    // Control personalizado: botón para alternar entre ver todos los popups abiertos y ver solo el más cercano
+    var toggleControl = L.control({position: 'topright'});
+    toggleControl.onAdd = function(map) {
+      var btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+      btn.innerHTML = 'Ver solo el más cercano';  // Texto inicial del botón
+      btn.style.backgroundColor = 'white';
+      btn.style.cursor = 'pointer';
+      btn.title = 'Alternar modo de popups';
+      // Detener propagación de eventos del botón para que no interfiera con el mapa
+      L.DomEvent.on(btn, 'click', L.DomEvent.stopPropagation)
+                .on(btn, 'click', L.DomEvent.preventDefault)
+                .on(btn, 'click', function() {
+        if (allPopupsOpen) {
+          // Cambiar a modo "solo el más cercano"
+          allPopupsOpen = false;
+          btn.innerHTML = 'Ver todos los popups';
+          // Cerrar todos los popups abiertos actualmente (marcadores)
+          markers.forEach(function(m) { m.closePopup(); });
+          // Cerrar popup de ubicación del usuario si estaba abierto
+          if (userMarker) { userMarker.closePopup(); }
+          // Obtener la ubicación actual del usuario
+          map.locate();  // Solicitar ubicación (dispara evento 'locationfound' más abajo)
+        } else {
+          // Cambiar a modo "ver todos"
+          allPopupsOpen = true;
+          btn.innerHTML = 'Ver solo el más cercano';
+          // Cerrar cualquier popup (por ejemplo, el abierto en modo anterior)
+          markers.forEach(function(m) { m.closePopup(); });
+          if (userMarker) { userMarker.closePopup(); }
+          // Volver a abrir todos los popups de los marcadores
+          markers.forEach(function(m) { m.openPopup(); });
+        }
+      });
+      return btn;
+    };
+    toggleControl.addTo(map);
+
+    // Control personalizado: botón "Mi ubicación" para encontrar y centrar la ubicación actual del usuario
+    var locateControl = L.control({position: 'topright'});
+    locateControl.onAdd = function(map) {
+      var btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+      btn.innerHTML = '📍';  // Emoji de marcador de ubicación
+      btn.style.backgroundColor = 'white';
+      btn.style.cursor = 'pointer';
+      btn.title = 'Mi ubicación';
+      L.DomEvent.on(btn, 'click', L.DomEvent.stopPropagation)
+                .on(btn, 'click', L.DomEvent.preventDefault)
+                .on(btn, 'click', function() {
+        // Iniciar geolocalización: centrar el mapa en la posición y hacer zoom
+        map.locate({ setView: true, maxZoom: 16 });
+      });
+      return btn;
+    };
+    locateControl.addTo(map);
+
+    // Evento: al encontrar la ubicación del usuario (disparado por map.locate)
+    map.on('locationfound', function(e) {
+      // Si estamos en modo "solo el más cercano", no añadimos/mostramos la ubicación del usuario (para no distraer)
+      if (!allPopupsOpen) {
+        // Encontrar y abrir el popup del marcador más cercano
+        var userLatLng = e.latlng;
+        var nearestMarker = null;
+        var minDist = Infinity;
+        markers.forEach(function(m) {
+          var dist = userLatLng.distanceTo(m.getLatLng());
+          if (dist < minDist) {
+            minDist = dist;
+            nearestMarker = m;
+          }
+        });
+        if (nearestMarker) {
+          nearestMarker.openPopup();
+          // Centrar el mapa en el marcador más cercano encontrado
+          map.panTo(nearestMarker.getLatLng());
+        }
+        return;  // Salir, no marcar ubicación del usuario en este modo
+      }
+      // Modo "todos los popups": mostrar la ubicación actual en el mapa
+      if (userMarker) {
+        map.removeLayer(userMarker);  // Si ya existe un marcador de usuario previo, eliminarlo
+      }
+      // Crear un nuevo marcador en la ubicación actual del usuario
+      userMarker = L.marker(e.latlng).addTo(map);
+      userMarker.bindPopup('Estás aquí');
+      userMarker.openPopup();  // Abrir popup indicando la posición actual
+    });
+
+    // Evento: error al obtener ubicación (por ejemplo, si el usuario deniega permisos)
+    map.on('locationerror', function() {
+      alert('No se pudo obtener tu ubicación');  // Avisar al usuario del problema
+    });
   </script>
 </body>
 </html>
