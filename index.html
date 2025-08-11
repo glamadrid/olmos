@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Mapa de Jayanca</title>
+  <title>Mapa Jayanca</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="leaflet.css" />
   <style>
@@ -34,49 +34,47 @@
   <script>
     const map = L.map('map').setView([-6.046, -79.758], 15);
 
-    // Mapa base libre (OpenStreetMap)
+    // Mapa base OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Polígono Arianna 4
-    const ariannaCoords = [
+    // Polígonos
+    L.polygon([
       [-6.041930, -79.744010],
       [-6.050974, -79.743989],
       [-6.051036, -79.771093],
       [-6.041992, -79.771113],
       [-6.041930, -79.744010]
-    ];
-    L.polygon(ariannaCoords, {
+    ], {
       color: '#0000ff', fillColor: '#00ff00', fillOpacity: 0.4
     }).addTo(map).bindPopup('<b>Arianna 4</b><br>Área: 300 ha');
 
-    // Polígono FUEGO Nº4
-    const fuegoCoords = [
+    L.polygon([
       [-6.036191, -79.746322],
       [-6.045236, -79.746302],
       [-6.045277, -79.764370],
       [-6.036233, -79.764391],
       [-6.036191, -79.746322]
-    ];
-    L.polygon(fuegoCoords, {
+    ], {
       color: '#ffcc00', fillColor: '#ff0000', fillOpacity: 0.4
     }).addTo(map).bindPopup('<b>FUEGO Nº4</b><br>Área: 200 ha');
 
-    // Botón Mi Ubicación
+    // Botón de Mi Ubicación
     document.getElementById('locate-btn').onclick = function() {
       map.locate({ setView: true, maxZoom: 17 });
     };
     map.on('locationfound', function(e) {
-      L.marker(e.latlng).addTo(map).bindPopup("📍 Usted está aquí").openPopup();
+      L.marker(e.latlng).addTo(map)
+        .bindPopup("📍 Usted está aquí").openPopup();
       L.circle(e.latlng, { radius: e.accuracy || 50 }).addTo(map);
     });
     map.on('locationerror', function() {
       alert("No se pudo obtener su ubicación");
     });
 
-    // Marcadores desde Google Sheets con contenido multimedia y nombre visible en zoom 17+
+    // Marcadores desde Google Sheets
     const publicSpreadsheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
     const markers = [];
 
@@ -92,7 +90,7 @@
             const marker = L.marker([lat, lon]).addTo(map);
             marker.basePopup = `<b>${item.titulo || item.Titulo}</b><br>`;
             marker.descPopup = buildPopupHTML(item);
-            marker.bindPopup(marker.basePopup);
+            marker.bindPopup(marker.basePopup + marker.descPopup);
             markers.push(marker);
           }
         });
@@ -126,8 +124,9 @@
       }
 
       if (videos.length) {
-        const videoUrl = videos[0].includes('youtube.com') ?
-          videos[0].replace('watch?v=', 'embed/') : videos[0];
+        const videoUrl = videos[0].includes('youtube.com')
+          ? videos[0].replace('watch?v=', 'embed/')
+          : videos[0];
         html += `<iframe width="100%" height="200" src="${videoUrl}" frameborder="0" allowfullscreen></iframe>`;
       }
 
@@ -149,12 +148,6 @@
       audioIndex = (audioIndex + dir + audios.length) % audios.length;
       audios.forEach((audio, i) => audio.style.display = (i === audioIndex) ? 'block' : 'none');
     }
-
-    // Eliminado el filtro por zoom: mostrar siempre toda la información
-      markers.forEach(m => {
-        m.setPopupContent(m.basePopup + m.descPopup);
-      });
-    });
   </script>
 </body>
 </html>
