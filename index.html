@@ -34,7 +34,6 @@
   <script>
     const map = L.map('map').setView([-6.046, -79.758], 15);
 
-    // Mapa base OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors'
@@ -61,92 +60,88 @@
       color: '#ffcc00', fillColor: '#ff0000', fillOpacity: 0.4
     }).addTo(map).bindPopup('<b>FUEGO Nº4</b><br>Área: 200 ha');
 
-    // Botón de Mi Ubicación
     document.getElementById('locate-btn').onclick = function() {
       map.locate({ setView: true, maxZoom: 17 });
     };
+
     map.on('locationfound', function(e) {
       L.marker(e.latlng).addTo(map)
         .bindPopup("📍 Usted está aquí").openPopup();
       L.circle(e.latlng, { radius: e.accuracy || 50 }).addTo(map);
     });
+
     map.on('locationerror', function() {
       alert("No se pudo obtener su ubicación");
     });
 
-    // Marcadores desde Google Sheets
     const publicSpreadsheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
-    const markers = [];
 
     Papa.parse(publicSpreadsheetUrl, {
       download: true,
       header: true,
       complete: function(results) {
-        const data = results.data;
-        data.forEach(item => {
-          const lat = parseFloat(item.latitud || item.Latitud);
-          const lon = parseFloat(item.longitud || item.Longitud);
-          if (!isNaN(lat) && !isNaN(lon)) {
-            const marker = L.marker([lat, lon]).addTo(map);
-            marker.basePopup = `<b>${item.titulo || item.Titulo}</b><br>`;
-            marker.descPopup = buildPopupHTML(item);
-            marker.bindPopup(marker.basePopup + marker.descPopup);
-            markers.push(marker);
+        results.data.forEach(item => {
+          const lat = parseFloat(item.latitud);
+          const lon = parseFloat(item.longitud);
+          if (isNaN(lat) || isNaN(lon)) return;
+
+          const fotos = (item.fotos || '').split('|').filter(f => f.trim());
+          const audios = (item.audios || '').split('|').filter(a => a.trim());
+          const videos = (item.videos || '').split('|').filter(v => v.trim());
+
+          let html = `<div class="popup-content">`;
+          html += `<h3>${item.titulo || ''}</h3>`;
+          html += `<p>${item.descripcion || ''}</p>`;
+
+          if (fotos.length > 0) {
+            html += `<img id="foto" src="${fotos[0]}" alt="Foto" />`;
+            if (fotos.length > 1) {
+              html += `<div class="carousel-controls">
+                <button onclick="nextFoto(-1)">◀️</button>
+                <button onclick="nextFoto(1)">▶️</button>
+              </div>`;
+            }
           }
+
+          if (audios.length > 0) {
+            html += `<audio id="audio" controls src="${audios[0]}"></audio>`;
+            if (audios.length > 1) {
+              html += `<div class="carousel-controls">
+                <button onclick="nextAudio(-1)">◀️</button>
+                <button onclick="nextAudio(1)">▶️</button>
+              </div>`;
+            }
+          }
+
+          if (videos.length > 0) {
+            let videoUrl = videos[0].trim();
+            if (videoUrl.includes("youtube.com/watch?v=")) {
+              videoUrl = videoUrl.replace("watch?v=", "embed/");
+            }
+            html += `<iframe width="100%" height="200" src="${videoUrl}" frameborder="0" allowfullscreen></iframe>`;
+          }
+
+          html += '</div>';
+
+          const marker = L.marker([lat, lon]).addTo(map);
+          marker.bindPopup(html);
         });
       }
     });
-
-    function buildPopupHTML(item) {
-      let html = '<div class="popup-content">';
-      const fotos = (item.fotos || '').split('|').filter(f => f.trim());
-      const audios = (item.audios || '').split('|').filter(a => a.trim());
-      const videos = (item.videos || '').split('|').filter(v => v.trim());
-
-      if (fotos.length) {
-        html += `<img id="foto" src="${fotos[0]}" alt="Foto" />`;
-        if (fotos.length > 1) {
-          html += '<div class="carousel-controls">';
-          html += '<button type="button" onclick="nextFoto(-1)">◀️</button>';
-          html += '<button type="button" onclick="nextFoto(1)">▶️</button>';
-          html += '</div>';
-        }
-      }
-
-      if (audios.length) {
-        html += `<audio id="audio" controls src="${audios[0]}"></audio>`;
-        if (audios.length > 1) {
-          html += '<div class="carousel-controls">';
-          html += '<button type="button" onclick="nextAudio(-1)">◀️</button>';
-          html += '<button type="button" onclick="nextAudio(1)">▶️</button>';
-          html += '</div>';
-        }
-      }
-
-      if (videos.length) {
-        const videoUrl = videos[0].includes('youtube.com')
-          ? videos[0].replace('watch?v=', 'embed/')
-          : videos[0];
-        html += `<iframe width="100%" height="200" src="${videoUrl}" frameborder="0" allowfullscreen></iframe>`;
-      }
-
-      html += '</div>';
-      return html;
-    }
 
     let fotoIndex = 0;
     let audioIndex = 0;
     function nextFoto(dir) {
       const imgs = document.querySelectorAll('img#foto');
-      if (imgs.length === 0) return;
+      if (!imgs.length) return;
       fotoIndex = (fotoIndex + dir + imgs.length) % imgs.length;
-      imgs.forEach((img, i) => img.style.display = (i === fotoIndex) ? 'block' : 'none');
+      imgs.forEach((img, i) => img.style.display = (i === fotoIndex ? 'block' : 'none'));
     }
     function nextAudio(dir) {
       const audios = document.querySelectorAll('audio#audio');
-      if (audios.length === 0) return;
+      if (!audios.length) return;
       audioIndex = (audioIndex + dir + audios.length) % audios.length;
-      audios.forEach((audio, i) => audio.style.display = (i === audioIndex) ? 'block' : 'none');
+      audios.forEach((a, i) => a.style.display = (i === audioIndex ? 'block' : 'none'));
     }
   </script>
 </body>
