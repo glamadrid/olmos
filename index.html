@@ -150,10 +150,9 @@
       audios.forEach((audio, i) => audio.style.display = (i === audioIndex) ? 'block' : 'none');
     }
 
-    map.on('zoomend', () => {
-      const zoom = map.getZoom();
+    // Eliminado el filtro por zoom: mostrar siempre toda la información
       markers.forEach(m => {
-        m.setPopupContent(zoom >= 17 ? m.basePopup + m.descPopup : m.basePopup);
+        m.setPopupContent(m.basePopup + m.descPopup);
       });
     });
   </script>
