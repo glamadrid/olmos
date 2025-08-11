@@ -3,19 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <title>Mapa Jayanca</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="leaflet.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
-    #map { height: 100%; width: 100%; }
-    #locate-btn {
-      position: absolute; top: 10px; right: 10px; z-index: 1000;
-      background: white; border: none; border-radius: 4px;
-      padding: 6px 10px; font-size: 14px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.3);
-    }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { height: 100vh; width: 100vw; }
     .popup-content img { max-width: 100%; height: auto; display: block; margin: 5px 0; }
-    .popup-content audio { width: 100%; margin: 5px 0; }
+    .popup-content audio, video { width: 100%; margin: 5px 0; }
     .carousel-controls { text-align: center; margin: 5px 0; }
     .carousel-controls button {
       background: #eee; border: none; padding: 5px 8px;
@@ -24,18 +18,14 @@
   </style>
 </head>
 <body>
-  <div id="map">
-    <button id="locate-btn">Mi Ubicación</button>
-  </div>
+  <div id="map"></div>
 
-  <script src="leaflet.js"></script>
-  <script src="papaparse.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
   <script>
     const map = L.map('map').setView([-6.046, -79.758], 15);
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
@@ -44,8 +34,7 @@
       [-6.041930, -79.744010],
       [-6.050974, -79.743989],
       [-6.051036, -79.771093],
-      [-6.041992, -79.771113],
-      [-6.041930, -79.744010]
+      [-6.041992, -79.771113]
     ], {
       color: '#0000ff', fillColor: '#00ff00', fillOpacity: 0.4
     }).addTo(map).bindPopup('<b>Arianna 4</b><br>Área: 300 ha');
@@ -54,75 +43,77 @@
       [-6.036191, -79.746322],
       [-6.045236, -79.746302],
       [-6.045277, -79.764370],
-      [-6.036233, -79.764391],
-      [-6.036191, -79.746322]
+      [-6.036233, -79.764391]
     ], {
       color: '#ffcc00', fillColor: '#ff0000', fillOpacity: 0.4
     }).addTo(map).bindPopup('<b>FUEGO Nº4</b><br>Área: 200 ha');
 
-    document.getElementById('locate-btn').onclick = function() {
-      map.locate({ setView: true, maxZoom: 17 });
-    };
+    // URL de Google Sheets en CSV
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
 
-    map.on('locationfound', function(e) {
-      L.marker(e.latlng).addTo(map)
-        .bindPopup("📍 Usted está aquí").openPopup();
-      L.circle(e.latlng, { radius: e.accuracy || 50 }).addTo(map);
-    });
-
-    map.on('locationerror', function() {
-      alert("No se pudo obtener su ubicación");
-    });
-
-    const publicSpreadsheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
-
-    Papa.parse(publicSpreadsheetUrl, {
+    Papa.parse(sheetUrl, {
       download: true,
       header: true,
       complete: function(results) {
-        results.data.forEach(item => {
+        results.data.forEach((item) => {
           const lat = parseFloat(item.latitud);
           const lon = parseFloat(item.longitud);
           if (isNaN(lat) || isNaN(lon)) return;
 
-          const fotos = (item.fotos || '').split('|').filter(f => f.trim());
-          const audios = (item.audios || '').split('|').filter(a => a.trim());
-          const videos = (item.videos || '').split('|').filter(v => v.trim());
-
           let html = `<div class="popup-content">`;
-          html += `<h3>${item.titulo || ''}</h3>`;
-          html += `<p>${item.descripcion || ''}</p>`;
+          html += `<h3>${item.titulo || 'Sin título'}</h3>`;
+          html += `<p>${item.descripcion || 'Sin descripción'}</p>`;
 
-          if (fotos.length > 0) {$1} else { html += '<p>📷 Sin fotos disponibles.</p>'; }" alt="Foto" />`;
+          // Fotos
+          const fotos = (item.fotos || '').split('|').filter(f => f.trim());
+          if (fotos.length > 0) {
+            html += `<img src="${fotos[0]}" alt="Foto">`;
             if (fotos.length > 1) {
               html += `<div class="carousel-controls">
                 <button onclick="nextFoto(-1)">◀️</button>
                 <button onclick="nextFoto(1)">▶️</button>
               </div>`;
             }
+          } else {
+            html += `<p>📷 Sin fotos disponibles.</p>`;
           }
 
-          if (audios.length > 0) {$1} else { html += '<p>🔈 Sin notas de voz disponibles.</p>'; }"></audio>`;
+          // Videos
+          const videos = (item.videos || '').split('|').filter(v => v.trim());
+          if (videos.length > 0) {
+            let videoUrl = videos[0];
+            if (videoUrl.includes("youtube.com")) {
+              const videoId = new URL(videoUrl).searchParams.get("v");
+              html += `<iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
+            } else {
+              html += `<video controls><source src="${videoUrl}" type="video/mp4"></video>`;
+            }
+          } else {
+            html += `<p>🎥 Sin video disponible.</p>`;
+          }
+
+          // Audios
+          const audios = (item.audios || '').split('|').filter(a => a.trim());
+          if (audios.length > 0) {
+            html += `<audio controls src="${audios[0]}"></audio>`;
             if (audios.length > 1) {
               html += `<div class="carousel-controls">
                 <button onclick="nextAudio(-1)">◀️</button>
                 <button onclick="nextAudio(1)">▶️</button>
               </div>`;
             }
+          } else {
+            html += `<p>🔈 Sin notas de voz disponibles.</p>`;
           }
 
-          if (videos.length > 0) {$1} else { html += '<p>🎥 Sin video disponible.</p>'; }
-            html += `<iframe width="100%" height="200" src="${videoUrl}" frameborder="0" allowfullscreen></iframe>`;
-          }
-
-          html += '</div>';
-
+          html += `</div>`;
           const marker = L.marker([lat, lon]).addTo(map);
           marker.bindPopup(html).openPopup();
         });
       }
     });
 
+    // Carruseles (si decides implementar funcionalidad múltiple)
     let fotoIndex = 0;
     let audioIndex = 0;
     function nextFoto(dir) {
@@ -131,6 +122,7 @@
       fotoIndex = (fotoIndex + dir + imgs.length) % imgs.length;
       imgs.forEach((img, i) => img.style.display = (i === fotoIndex ? 'block' : 'none'));
     }
+
     function nextAudio(dir) {
       const audios = document.querySelectorAll('audio#audio');
       if (!audios.length) return;
