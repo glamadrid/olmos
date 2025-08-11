@@ -93,8 +93,7 @@
           html += `<h3>${item.titulo || ''}</h3>`;
           html += `<p>${item.descripcion || ''}</p>`;
 
-          if (fotos.length > 0) {
-            html += `<img id="foto" src="${fotos[0]}" alt="Foto" />`;
+          if (fotos.length > 0) {$1} else { html += '<p>📷 Sin fotos disponibles.</p>'; }" alt="Foto" />`;
             if (fotos.length > 1) {
               html += `<div class="carousel-controls">
                 <button onclick="nextFoto(-1)">◀️</button>
@@ -103,8 +102,7 @@
             }
           }
 
-          if (audios.length > 0) {
-            html += `<audio id="audio" controls src="${audios[0]}"></audio>`;
+          if (audios.length > 0) {$1} else { html += '<p>🔈 Sin notas de voz disponibles.</p>'; }"></audio>`;
             if (audios.length > 1) {
               html += `<div class="carousel-controls">
                 <button onclick="nextAudio(-1)">◀️</button>
@@ -113,18 +111,14 @@
             }
           }
 
-          if (videos.length > 0) {
-            let videoUrl = videos[0].trim();
-            if (videoUrl.includes("youtube.com/watch?v=")) {
-              videoUrl = videoUrl.replace("watch?v=", "embed/");
-            }
+          if (videos.length > 0) {$1} else { html += '<p>🎥 Sin video disponible.</p>'; }
             html += `<iframe width="100%" height="200" src="${videoUrl}" frameborder="0" allowfullscreen></iframe>`;
           }
 
           html += '</div>';
 
           const marker = L.marker([lat, lon]).addTo(map);
-          marker.bindPopup(html);
+          marker.bindPopup(html).openPopup();
         });
       }
     });
