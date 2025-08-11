@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Visor de Mapa - Jayanca</title>
+  <title>Mapa de Jayanca</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="leaflet.css" />
   <style>
@@ -26,48 +26,43 @@
   <script src="https://unpkg.com/leaflet.gridlayer.googlemutant@0.11.2/Leaflet.GoogleMutant.js"></script>
 
   <script>
-    var map = L.map('map').setView([-6.046, -79.758], 15);
+    const map = L.map('map').setView([-6.046, -79.758], 15);
 
-    // Capa de Google Maps (satelital)
-    var googleRoadmap = L.gridLayer.googleMutant({
-      type: 'roadmap'  // otros valores: 'satellite', 'terrain', 'hybrid'
+    // ✅ Mapa base de Google (roadmap)
+    const googleLayer = L.gridLayer.googleMutant({
+      type: 'roadmap' // puedes cambiar a 'satellite', 'hybrid', 'terrain'
     }).addTo(map);
 
-    // --- POLÍGONO: Arianna 4 ---
-    var ariannaCoords = [
+    // ✅ Polígono Arianna 4
+    const ariannaCoords = [
       [-6.041930, -79.744010],
       [-6.050974, -79.743989],
       [-6.051036, -79.771093],
       [-6.041992, -79.771113],
       [-6.041930, -79.744010]
     ];
-
-    var ariannaPolygon = L.polygon(ariannaCoords, {
+    const ariannaPolygon = L.polygon(ariannaCoords, {
       color: '#0000ff',       // borde azul
       fillColor: '#00ff00',   // relleno verde
-      fillOpacity: 0.4        // transparencia del relleno (0 = invisible, 1 = opaco)
-    }).addTo(map);
-    ariannaPolygon.bindPopup('<b>Arianna 4</b><br>Área aproximada: 300 ha.');
+      fillOpacity: 0.4
+    }).addTo(map).bindPopup('<b>Arianna 4</b><br>Área: 300 ha');
 
-    // --- POLÍGONO: FUEGO Nº4 ---
-    var fuegoCoords = [
+    // ✅ Polígono FUEGO Nº4
+    const fuegoCoords = [
       [-6.036191, -79.746322],
       [-6.045236, -79.746302],
       [-6.045277, -79.764370],
       [-6.036233, -79.764391],
       [-6.036191, -79.746322]
     ];
-
-    var fuegoPolygon = L.polygon(fuegoCoords, {
+    const fuegoPolygon = L.polygon(fuegoCoords, {
       color: '#ffcc00',       // borde amarillo
       fillColor: '#ff0000',   // relleno rojo
-      fillOpacity: 0.4        // transparencia del relleno
-    }).addTo(map);
-    fuegoPolygon.bindPopup('<b>FUEGO Nº4</b><br>Área aproximada: 200 ha.');
+      fillOpacity: 0.4
+    }).addTo(map).bindPopup('<b>FUEGO Nº4</b><br>Área: 200 ha');
 
-    // --- BOTÓN: Mi Ubicación ---
-    var locateBtn = document.getElementById('locate-btn');
-    locateBtn.onclick = function() {
+    // ✅ Botón "Mi Ubicación"
+    document.getElementById('locate-btn').onclick = function() {
       map.locate({ setView: true, maxZoom: 17 });
     };
 
@@ -81,25 +76,37 @@
       alert("No se pudo obtener su ubicación");
     });
 
-    // --- Cargar marcadores desde Google Sheets CSV usando PapaParse ---
-    var publicSpreadsheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
+    // ✅ Marcadores desde Google Sheets CSV
+    const publicSpreadsheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHLS2rYQc7iCFWdIPXRESfwAxPqJCfnfd39t6z6ppfeAP9DdQYPLPsoCjbM9y-K8zsGdPfOvBSeVGp/pub?gid=0&single=true&output=csv";
+
+    const markers = [];
 
     Papa.parse(publicSpreadsheetUrl, {
       download: true,
       header: true,
       complete: function(results) {
-        var data = results.data;
-        data.forEach(function(item) {
-          if (!item.latitud || !item.longitud) return;
-          var lat = parseFloat(item.latitud || item.Latitud);
-          var lon = parseFloat(item.longitud || item.Longitud);
-          if (isNaN(lat) || isNaN(lon)) return;
-
-          var marker = L.marker([lat, lon]).addTo(map);
-          var popup = `<b>${item.titulo || item.Titulo}</b><br>${item.descripcion || ''}`;
-          marker.bindPopup(popup);
+        const data = results.data;
+        data.forEach(item => {
+          const lat = parseFloat(item.latitud || item.Latitud);
+          const lon = parseFloat(item.longitud || item.Longitud);
+          if (!isNaN(lat) && !isNaN(lon)) {
+            const marker = L.marker([lat, lon]).addTo(map);
+            marker.basePopup = `<b>${item.titulo || item.Titulo}</b><br>`;
+            marker.descPopup = item.descripcion || item.Descripcion || '';
+            marker.bindPopup(marker.basePopup); // solo título por defecto
+            markers.push(marker);
+          }
         });
       }
+    });
+
+    // ✅ Mostrar descripción solo cuando el zoom es mayor a 17
+    map.on('zoomend', () => {
+      const zoom = map.getZoom();
+      markers.forEach(m => {
+        const fullContent = m.basePopup + (zoom >= 17 ? m.descPopup : '');
+        m.setPopupContent(fullContent);
+      });
     });
   </script>
 </body>
